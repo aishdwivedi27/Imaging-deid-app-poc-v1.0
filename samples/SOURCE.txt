@@ -1,0 +1,15 @@
+Real radiographs used for the demo (already anonymised by the publisher, no real patient identity):
+
+chest_pa_RG1.dcm  - CR chest PA, 1955 x 1841, uncompressed (Philips); visible finding: multiple bilateral
+                     rounded pulmonary opacities (nodules)
+tibia_RG3.dcm      - CR right leg AP, 1760 x 1760, uncompressed (Fuji); publisher-documented finding:
+                     "Non-ossifying fibroma of distal tibia"
+pelvis_hip_RG2.dcm - CR pelvis / hip AP, JPEG Lossless compressed (spare; no documented finding, not used)
+
+Origin: NEMA DICOM Working Group 4 (compression) public test data set,
+ftp://medical.nema.org/MEDICAL/Dicom/DataSets/WG04/ - redistributed in the pydicom test data
+(github.com/pydicom/pydicom-data) and github.com/robyoung/dicom-test-files.
+Intended for software testing and demonstration. Not for clinical use or for training/licensing.
+
+make_sample_data.py stamps FAKE Indian patient details onto copies of these files so the
+pipeline has something to remove. The reports in the demo are fictional.

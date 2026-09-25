@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+secure/
+deidentified_output/
+sample_inbox/
+.staging_*/
+ohif-local/
+doctor_demo/

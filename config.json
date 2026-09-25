@@ -1,0 +1,9 @@
+{
+  "output_dir": "deidentified_output",
+  "secure_dir": "secure",
+  "date_mode": "shift",
+  "ocr_enabled": true,
+  "ocr_modalities": ["CR", "DX", "RG", "US", "MG", "XA", "RF", "SC", "OT", "ES", "XC"],
+  "ner_enabled": true,
+  "age_cap_years": 90
+}

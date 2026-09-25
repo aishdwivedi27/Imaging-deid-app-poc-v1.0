@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>De-identification Station</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231C2B3A'/%3E%3Cpath d='M9 11h14M9 16h9M9 21h11' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M9 11h14M9 16h9M9 21h11"/></svg>
+      <div>
+        <h1>De-identification Station</h1>
+        <p>X-ray · CT · Ultrasound · Reports — processed on this computer only</p>
+      </div>
+    </div>
+    <div class="caps" id="caps">
+      <span class="pill" id="pill-local" title="The server only listens on 127.0.0.1">Local only</span>
+      <span class="pill" id="pill-ocr">OCR …</span>
+      <span class="pill" id="pill-ner">Name detection …</span>
+      <a class="pill off" id="pill-ohif" target="_blank" rel="noopener" title="Open the local OHIF DICOM viewer in a new tab">OHIF viewer …</a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: input + options -->
+    <aside class="side">
+      <section class="card">
+        <h2><span class="step">1</span>Add studies</h2>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Drop files or folders here, or press Enter to browse">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 31V13m0 0-7 7m7-7 7 7"/><path d="M10 29v6a4 4 0 0 0 4 4h20a4 4 0 0 0 4-4v-6"/></svg>
+          <strong>Drop DICOM files, reports or whole folders</strong>
+          <span>Images with or without .dcm, reports as .txt or .docx</span>
+          <div class="drop-actions">
+            <button class="btn" id="btn-files" type="button">Browse files</button>
+            <button class="btn" id="btn-folder" type="button">Browse folder</button>
+          </div>
+          <input type="file" id="in-files" multiple hidden>
+          <input type="file" id="in-folder" webkitdirectory directory multiple hidden>
+        </div>
+        <div class="upload-bar" id="upload-bar" hidden><div></div><span></span></div>
+
+        <div class="divider"><span>or process a folder already on this computer</span></div>
+        <form class="row" id="form-folder">
+          <input id="folder-path" type="text" placeholder="e.g. D:\Exports\2026-09  or  ~/exports/sep" autocomplete="off" spellcheck="false">
+          <button class="btn primary" type="submit">Run</button>
+        </form>
+        <p class="hint">Reads the folder in place and loops through it study by study. Nothing is copied or uploaded.</p>
+      </section>
+
+      <section class="card">
+        <h2><span class="step">2</span>Options</h2>
+        <label class="field">
+          <span>Output folder</span>
+          <div class="row">
+            <input id="out-dir" type="text" spellcheck="false">
+            <button class="btn" id="btn-save-out" type="button">Save</button>
+          </div>
+          <small id="out-abs" class="mono muted"></small>
+        </label>
+
+        <label class="toggle">
+          <input type="checkbox" id="opt-ocr">
+          <span class="track"><span class="thumb"></span></span>
+          <span><b>Mask burned-in text</b><small>OCR finds names printed on X-ray and ultrasound images and blacks them out</small></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="opt-ner">
+          <span class="track"><span class="thumb"></span></span>
+          <span><b>Find names in reports</b><small>Second pass with Presidio after the rule-based redaction</small></span>
+        </label>
+
+        <div class="field">
+          <span>Dates</span>
+          <div class="seg" id="seg-date" role="radiogroup">
+            <button type="button" data-v="shift" role="radio"title="Every date for a patient moves back by the same 1–365 days">Shift</button>
+            <button type="button" data-v="year_only" role="radio">Year only</button>
+            <button type="button" data-v="remove" role="radio">Remove</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card tree-card">
+        <h2>Output structure</h2>
+        <pre class="tree mono">output/
+├─ S7DB2…C0A0/        one folder per record
+│  ├─ CR_002_00001.dcm
+│  ├─ report.txt      redacted
+│  ├─ preview.png
+│  └─ record.json
+├─ _needs_review/     QA failures held back
+├─ deidentified_records.json
+└─ deidentified_records.csv</pre>
+      </section>
+    </aside>
+
+    <!-- RIGHT: job + records -->
+    <section class="main">
+      <section class="card job" id="job">
+        <div class="job-head">
+          <div>
+            <h2 id="job-title">Ready</h2>
+            <p class="muted" id="job-sub">Add studies to start. Each study becomes one de-identified record.</p>
+          </div>
+          <button class="btn ghost" id="btn-cancel" type="button" hidden>Stop after current record</button>
+        </div>
+        <div class="progress" aria-hidden="true"><div id="progress"></div></div>
+        <div class="stats">
+          <div><b id="st-records">0</b><span>Records</span></div>
+          <div><b id="st-images">0</b><span>Images</span></div>
+          <div><b id="st-ocr">0</b><span>Text regions masked</span></div>
+          <div><b id="st-red">0</b><span>Report redactions</span></div>
+          <div class="warn"><b id="st-review">0</b><span>Need review</span></div>
+        </div>
+        <ol class="log mono" id="log"></ol>
+      </section>
+
+      <section class="card records">
+        <div class="records-head">
+          <h2>Records <span class="count" id="rec-count">0</span></h2>
+          <div class="tools">
+            <input id="filter" type="search" placeholder="Filter by ID, modality, body part…">
+            <button class="btn" id="btn-open" type="button">Open output folder</button>
+            <a class="btn" id="dl-csv" href="/api/download/csv">CSV</a>
+            <a class="btn" id="dl-json" href="/api/download/json">JSON</a>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>Record</th><th>Study</th><th class="num">Images</th><th>Report</th><th class="num">Redactions</th><th class="num">Masked</th><th>QA</th><th>Processed</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="empty" id="empty">No records yet. Processed studies appear here one by one.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Record drawer -->
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div><span class="muted">Record</span><h3 class="mono" id="d-id"></h3></div>
+      <button class="btn ghost" id="d-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="drawer-body">
+      <img id="d-img" alt="De-identified preview">
+      <dl class="facts" id="d-facts"></dl>
+      <div id="d-findings"></div>
+      <h4>Redacted report</h4>
+      <pre class="report mono" id="d-report"></pre>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
