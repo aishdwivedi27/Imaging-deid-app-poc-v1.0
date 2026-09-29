@@ -71,6 +71,50 @@ findings = engine._qa_record(bad, {"Sharma"}, (bad / "report.txt").read_text())
 codes = {x.split()[0] for x in findings}
 check({"A1", "A2", "A4"} <= codes, f"QA flagged private tag, name and phone ({sorted(codes)})")
 
+print("Vendor name in InstitutionName is not an identifier (dental CBCT)")
+from pydicom.dataset import Dataset  # noqa: E402
+from app import core  # noqa: E402
+v = Dataset(); v.PatientName = "DEMO^PATIENT"; v.InstitutionName = "VATECH Co., Ltd."
+v.Manufacturer = "VATECH Co., Ltd."; v.ManufacturerModelName = "PHT-75CHS"
+ids = core.known_identifiers(v)
+check("VATECH Co., Ltd." not in ids and {"DEMO", "PATIENT"} <= ids, "vendor-as-institution skipped, patient name still checked")
+v.InstitutionName = "Sunrise Diagnostics"
+check("Sunrise Diagnostics" in core.known_identifiers(v), "a real institution name is still an identifier")
+
+if ocr_mask.available():
+    print("Burned-in text: small text, neighbouring words, markers")
+    import numpy as np  # noqa: E402
+    from PIL import Image, ImageDraw, ImageFont  # noqa: E402
+    from pydicom.dataset import FileMetaDataset  # noqa: E402
+    from pydicom.uid import ExplicitVRLittleEndian  # noqa: E402
+
+    def _xray(texts, W=2800, H=2300):
+        yy, xx = np.mgrid[0:H, 0:W]
+        base = 800 + 1500 * np.exp(-(((xx - W / 2) / 900) ** 2 + ((yy - H / 2) / 800) ** 2))
+        im = Image.new("L", (W, H)); d = ImageDraw.Draw(im)
+        for x, y, size, t in texts:
+            try:
+                font = ImageFont.truetype("DejaVuSans.ttf", size)
+            except OSError:
+                font = ImageFont.truetype("arial.ttf", size)
+            d.text((x, y), t, font=font, fill=255)
+        m = np.asarray(im) > 0
+        a = np.where(m, 4095, base).astype(np.uint16)
+        x = Dataset(); x.file_meta = FileMetaDataset(); x.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+        x.Modality = "CR"; x.Rows, x.Columns = a.shape; x.SamplesPerPixel = 1; x.PhotometricInterpretation = "MONOCHROME2"
+        x.BitsAllocated = 16; x.BitsStored = 12; x.HighBit = 11; x.PixelRepresentation = 0; x.PixelData = a.tobytes()
+        return x, a, m
+
+    x, a, m = _xray([(40, 2250, 11, "PATEL ANANYA 9839001122")])
+    r = ocr_mask.mask_dataset(x)
+    check(r["regions"] >= 1 and (x.pixel_array[m] != a[m]).all(), "11-pixel name on a 2800-pixel X-ray is masked")
+    x, a, m = _xray([(1100, 1100, 40, "SHARMA RAMESH")])
+    r = ocr_mask.mask_dataset(x)
+    check((x.pixel_array[m] != a[m]).all() and r["interior"] >= 1, "whole name over anatomy masked and flagged for review")
+    x, a, m = _xray([(2500, 1900, 70, "R")])
+    r = ocr_mask.mask_dataset(x)
+    check(r["regions"] == 0, "a lone positional marker is kept")
+
 shutil.rmtree(tmp, ignore_errors=True)
 print("\nALL CHECKS PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

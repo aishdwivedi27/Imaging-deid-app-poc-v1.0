@@ -302,7 +302,7 @@ class Job:
                 shutil.copy2(f, work / f.name)
 
         identifiers, meta, excluded = set(), {}, defaultdict(int)
-        ocr_regions, ocr_unverified, written, mods = 0, 0, [], set()
+        ocr_regions, ocr_unverified, ocr_interior, written, mods = 0, 0, 0, [], set()
         for p, sha in st["files"]:
             ds = pydicom.dcmread(p)
             identifiers |= core.known_identifiers(ds)
@@ -327,6 +327,7 @@ class Job:
                 r = ocr_mask.mask_dataset(ds)
                 ocr_regions += r["regions"]
                 ocr_unverified += 0 if r["verified"] else 1
+                ocr_interior += 1 if r.get("interior") else 0
             o = core.deid_dataset(ds, key, cfg, pat, rid, shift)
             if "BurnedInAnnotation" in ds:
                 o.BurnedInAnnotation = ds.BurnedInAnnotation
@@ -366,6 +367,8 @@ class Job:
         findings = _qa_record(work, identifiers, report_text)
         if ocr_unverified:
             findings.append(f"A7 {ocr_unverified} image(s): text still detected after masking")
+        if ocr_interior:
+            findings.append(f"A7 {ocr_interior} image(s): text inside the image area was masked; check the pixels")
         if not dcms:
             findings.append("No releasable images in this record")
         status = "pass" if not findings else "review"

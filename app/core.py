@@ -113,12 +113,23 @@ def age_from(ds):
         return f"{max(yrs, 0):03d}Y"
     return ""
 
+def _norm(v):
+    """Lower-case, punctuation-insensitive form used to compare vendor names."""
+    return re.sub(r"[^a-z0-9]+", " ", str(v or "").lower()).strip()
+
+
 def known_identifiers(ds):
     """Exact strings from the original header that must never appear in outputs."""
     vals = set()
+    # Some modality software (e.g. dental CBCT) writes the vendor's own name into InstitutionName.
+    # The vendor name is not a patient or site identifier and is kept in Manufacturer for buyers,
+    # so an institution value that is really the vendor name is not treated as an identifier.
+    vendor = {_norm(ds.get(k, "")) for k in ("Manufacturer", "ManufacturerModelName")} - {""}
     for tag in ("PatientID", "AccessionNumber", "OtherPatientIDs", "InstitutionName",
                 "InstitutionAddress", "PatientAddress", "PatientTelephoneNumbers"):
         v = str(ds.get(tag, "") or "").strip()
+        if tag.startswith("Institution") and _norm(v) in vendor:
+            continue
         if len(v) >= 3:
             vals.add(v)
     for tag in ("PatientName", "ReferringPhysicianName", "PerformingPhysicianName",
