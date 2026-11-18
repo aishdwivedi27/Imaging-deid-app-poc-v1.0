@@ -1,0 +1,109 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e7]:
+      - heading "De-identification Station" [level=1] [ref=e8]
+      - paragraph [ref=e9]: X-ray · CT · Ultrasound · Reports — processed on this computer only
+    - generic [ref=e10]:
+      - generic "The server only listens on 127.0.0.1" [ref=e11]: Local only
+      - generic [ref=e12]: OCR …
+      - generic [ref=e13]: Name detection …
+      - generic "Open the local OHIF DICOM viewer in a new tab" [ref=e14]: OHIF viewer …
+  - main [ref=e15]:
+    - complementary [ref=e16]:
+      - generic [ref=e17]:
+        - heading "1 Add studies" [level=2] [ref=e18]:
+          - generic [ref=e19]: "1"
+          - text: Add studies
+        - button "Drop files or folders here, or press Enter to browse" [ref=e20] [cursor=pointer]:
+          - strong [ref=e24]: Drop DICOM files, reports or whole folders
+          - generic [ref=e25]: Images with or without .dcm, reports as .txt or .docx
+          - generic [ref=e26]:
+            - button "Browse files" [ref=e27]
+            - button "Browse folder" [ref=e28]
+        - generic [ref=e29]: or process a folder already on this computer
+        - generic [ref=e31]:
+          - textbox "e.g. D:\\Exports\\2026-09 or ~/exports/sep" [ref=e32]:
+            - /placeholder: e.g. D:\Exports\2026-09  or  ~/exports/sep
+          - button "Run" [ref=e33] [cursor=pointer]
+        - paragraph [ref=e34]: Reads the folder in place and loops through it study by study. Nothing is copied or uploaded.
+      - generic [ref=e35]:
+        - heading "2 Options" [level=2] [ref=e36]:
+          - generic [ref=e37]: "2"
+          - text: Options
+        - generic [ref=e38]:
+          - generic [ref=e39]: Output folder
+          - generic [ref=e40]:
+            - textbox "Output folder Save" [ref=e41]
+            - button "Save" [ref=e42] [cursor=pointer]
+        - generic [ref=e43] [cursor=pointer]:
+          - checkbox "Mask burned-in text OCR finds names printed on X-ray and ultrasound images and blacks them out"
+          - generic [ref=e46]:
+            - generic [ref=e47]: Mask burned-in text
+            - generic [ref=e48]: OCR finds names printed on X-ray and ultrasound images and blacks them out
+        - generic [ref=e49] [cursor=pointer]:
+          - checkbox "Find names in reports Second pass with Presidio after the rule-based redaction"
+          - generic [ref=e52]:
+            - generic [ref=e53]: Find names in reports
+            - generic [ref=e54]: Second pass with Presidio after the rule-based redaction
+        - generic [ref=e55]:
+          - generic [ref=e56]: Dates
+          - radiogroup [ref=e57]:
+            - radio "Shift" [ref=e58] [cursor=pointer]
+            - radio "Year only" [ref=e59] [cursor=pointer]
+            - radio "Remove" [ref=e60] [cursor=pointer]
+      - generic [ref=e61]:
+        - heading "Output structure" [level=2] [ref=e62]
+        - generic [ref=e63]: output/ ├─ S7DB2…C0A0/ one folder per record │ ├─ CR_002_00001.dcm │ ├─ report.txt redacted │ ├─ preview.png │ └─ record.json ├─ _needs_review/ QA failures held back ├─ deidentified_records.json └─ deidentified_records.csv
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - generic [ref=e67]:
+          - heading "Ready" [level=2] [ref=e68]
+          - paragraph [ref=e69]: Add studies to start. Each study becomes one de-identified record.
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - generic [ref=e73]: "0"
+            - text: Records
+          - generic [ref=e74]:
+            - generic [ref=e75]: "0"
+            - text: Images
+          - generic [ref=e76]:
+            - generic [ref=e77]: "0"
+            - text: Text regions masked
+          - generic [ref=e78]:
+            - generic [ref=e79]: "0"
+            - text: Report redactions
+          - generic [ref=e80]:
+            - generic [ref=e81]: "0"
+            - text: Need review
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - heading "Records 0" [level=2] [ref=e84]:
+            - text: Records
+            - generic [ref=e85]: "0"
+          - generic [ref=e86]:
+            - searchbox "Filter by ID, modality, body part…" [ref=e87]
+            - button "Open output folder" [ref=e88] [cursor=pointer]
+            - link "CSV" [ref=e89] [cursor=pointer]:
+              - /url: /api/download/csv
+            - link "JSON" [ref=e90] [cursor=pointer]:
+              - /url: /api/download/json
+        - generic [ref=e91]:
+          - table [ref=e92]:
+            - rowgroup [ref=e93]:
+              - row [ref=e94]:
+                - columnheader [ref=e95]
+                - columnheader "Record" [ref=e96]
+                - columnheader "Study" [ref=e97]
+                - columnheader "Images" [ref=e98]
+                - columnheader "Report" [ref=e99]
+                - columnheader "Redactions" [ref=e100]
+                - columnheader "Masked" [ref=e101]
+                - columnheader "QA" [ref=e102]
+                - columnheader "Processed" [ref=e103]
+            - rowgroup
+          - generic [ref=e104]: No records yet. Processed studies appear here one by one.
+  - complementary [aria-hidden] [ref=e105]:
+    - generic [ref=e106]:
+      - generic [ref=e107]: Record
+      - button [ref=e108] [cursor=pointer]: ✕
+    - heading [level=4] [ref=e111]: Redacted report

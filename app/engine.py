@@ -14,7 +14,7 @@ Record-by-record de-identification engine.
 
 CLI:  python -m app.engine --input INBOX --output OUT
 """
-import argparse, csv, datetime as dt, hashlib, json, os, re, shutil, sys, threading
+import argparse, csv, datetime as dt, hashlib, json, os, re, shutil, sys, threading, uuid
 from collections import defaultdict
 from pathlib import Path
 
@@ -174,6 +174,15 @@ def _qa_record(folder, identifiers, report_text):
     return findings
 
 
+def _locate(out, rid, store):
+    """Where an earlier record lives now, so a re-sent file can point the user to it."""
+    for folder, status in ((out / rid, "pass"), (out / "_needs_review" / rid, "review")):
+        if folder.is_dir():
+            return {"folder": str(folder), "qa_status": store.records.get(rid, {}).get("qa_status", status), "missing": False}
+    # the ledger says it was processed, but the output was moved or deleted: these files will keep being skipped
+    return {"folder": str(out / rid), "qa_status": None, "missing": True}
+
+
 def _match_report(study, reports, studies_by_dir, studies_by_pid):
     for r in reports:
         if r in study["_used_reports"]:
@@ -193,7 +202,8 @@ class Job:
     def __init__(self, input_dir, settings, job_id=None, cleanup_input=False):
         self.input_dir = Path(input_dir)
         self.s = settings
-        self.id = job_id or dt.datetime.now().strftime("J%Y%m%d-%H%M%S")
+        # timestamp alone clashed when two jobs started in the same second; the suffix keeps ids unique
+        self.id = job_id or dt.datetime.now().strftime("J%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
         self.cleanup_input = cleanup_input
         self.cancel = threading.Event()
         self.events = []
@@ -227,14 +237,17 @@ class Job:
 
         # 1. index ---------------------------------------------------------------------------
         files = [p for p in self.input_dir.rglob("*") if p.is_file() and not p.name.startswith(".")]
-        reports = [p for p in files if p.suffix.lower() in REPORT_EXTS]
-        studies, skipped = {}, defaultdict(int)
+        reports, studies, skipped = [], {}, defaultdict(int)
+        already = defaultdict(int)                     # record_id -> files sent again
         for p in files:
-            if p.suffix.lower() in REPORT_EXTS:
-                continue
             sha = core.sha256_file(p)
             if sha in ledger.seen:
                 skipped["already processed"] += 1
+                if ledger.seen[sha].get("record_id"):
+                    already[ledger.seen[sha]["record_id"]] += 1
+                continue
+            if p.suffix.lower() in REPORT_EXTS:
+                reports.append(p)
                 continue
             try:
                 ds = pydicom.dcmread(p, stop_before_pixels=True)
@@ -255,6 +268,9 @@ class Job:
             studies_by_pid[st["pid"]].add(st["suid"])
         self.emit(type="indexed", files=len(files), studies=len(studies), reports=len(reports),
                   skipped=dict(skipped))
+        if already:
+            self.emit(type="already_processed",
+                      records=[{"record_id": rid, "files": n, **_locate(out, rid, store)} for rid, n in already.items()])
 
         # 2. record loop ----------------------------------------------------------------------
         done, totals, used_reports = 0, defaultdict(int), set()
@@ -262,11 +278,15 @@ class Job:
             if self.cancel.is_set():
                 self.emit(type="cancelled", done=done)
                 break
+            self._current_rid = None
             try:
                 rec = self._process_study(st, key, cfg, out, store, ledger, reports, used_reports,
                                           studies_by_dir, studies_by_pid, use_ocr, use_ner)
             except Exception as e:  # never stop the loop for one bad study
-                self.emit(type="record_error", error=f"{type(e).__name__}: {e}")
+                rid = self._current_rid
+                if rid:  # drop the half-built work folder; the source files stay unmarked and are retried next run
+                    shutil.rmtree(out / f".work_{rid}", ignore_errors=True)
+                self.emit(type="record_error", record_id=rid, error=f"{type(e).__name__}: {e}")
                 totals["errors"] += 1
                 continue
             done += 1
@@ -290,6 +310,7 @@ class Job:
         pat = "P" + core.h(key, "patient", pid)[:12].upper()
         rid = "S" + core.h(key, "study", st["suid"])[:12].upper()
         shift = int(core.h(key, "shift", pid)[:8], 16) % 365 + 1
+        self._current_rid = rid
         self.emit(type="record_start", record_id=rid, images=len(st["files"]))
 
         work = out / f".work_{rid}"
@@ -301,6 +322,9 @@ class Job:
             for f in existing.iterdir():
                 shutil.copy2(f, work / f.name)
 
+        # ledger rows are held until the record is committed: if this study fails part-way, its files
+        # must not be marked as processed, or the next run would skip them and they would never be output
+        pending = []
         identifiers, meta, excluded = set(), {}, defaultdict(int)
         ocr_regions, ocr_unverified, ocr_interior, written, mods = 0, 0, 0, [], set()
         for p, sha in st["files"]:
@@ -317,11 +341,13 @@ class Job:
                 reason = "screen capture / dose report"
             risky = mod in self.s["ocr_modalities"] or str(ds.get("BurnedInAnnotation", "")).upper() == "YES" \
                 or sop.startswith("1.2.840.10008.5.1.4.1.1.7")
-            if not reason and risky and not use_ocr and (mod in {"US", "SC", "OT"} or str(ds.get("BurnedInAnnotation", "")).upper() == "YES"):
+            # without OCR nothing can mask burned-in text, so every risky image is held back
+            # (previously only US/SC/OT were, and CR/DX/MG/XA/RF went out with their pixels untouched)
+            if not reason and risky and not use_ocr:
                 reason = "may contain burned-in text (OCR off)"
             if reason:
                 excluded[reason] += 1
-                ledger.add(sha, str(p.relative_to(self.input_dir)), f"excluded: {reason}", rid)
+                pending.append((sha, str(p.relative_to(self.input_dir)), f"excluded: {reason}", rid))
                 continue
             if risky and use_ocr:
                 r = ocr_mask.mask_dataset(ds)
@@ -336,7 +362,7 @@ class Job:
             name = f"{mod}_{series:03d}_{int(inst):05d}.dcm" if inst.isdigit() else f"{mod}_{series:03d}_{inst}.dcm"
             o.save_as(work / name, enforce_file_format=True)
             written.append(name)
-            ledger.add(sha, str(p.relative_to(self.input_dir)), "ok", rid)
+            pending.append((sha, str(p.relative_to(self.input_dir)), "ok", rid))
             if not meta:
                 meta = {k: str(o.get(k, "")) for k in ("Modality", "BodyPartExamined", "StudyDescription", "StudyDate",
                                                         "PatientSex", "PatientAge", "Manufacturer", "ManufacturerModelName")}
@@ -352,8 +378,7 @@ class Job:
                 report_text, ner_counts = text_ner.redact(report_text)
                 red_counts.update(ner_counts)
             (work / "report.txt").write_text(report_text, encoding="utf-8")
-            used_reports.add(rp)
-            ledger.add(core.sha256_file(rp), str(rp.relative_to(self.input_dir)), "report ok", rid)
+            pending.append((core.sha256_file(rp), str(rp.relative_to(self.input_dir)), "report ok", rid))
         elif (work / "report.txt").exists():
             report_text = (work / "report.txt").read_text(encoding="utf-8")
 
@@ -406,6 +431,10 @@ class Job:
         }
         (dest / "record.json").write_text(json.dumps(rec, indent=2))
         store.upsert(rec)
+        for row in pending:
+            ledger.add(*row)
+        if rp is not None:
+            used_reports.add(rp)
         return rec
 
 

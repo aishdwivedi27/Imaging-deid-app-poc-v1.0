@@ -112,6 +112,8 @@ input[type=text]::placeholder, input[type=search]::placeholder { color: var(--mu
 .log:empty { display: none; }
 .log li { padding: 2px 0; color: var(--accent); }
 .log li.ok { color: var(--pass); } .log li.rev { color: var(--review); } .log li.err { color: var(--err); }
+.log li.link { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.log li.link:hover, .log li.link:focus-visible { text-decoration-style: solid; outline: none; }
 .log time { color: var(--muted); margin-right: 8px; }
 
 /* records */

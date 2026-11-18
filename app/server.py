@@ -108,11 +108,17 @@ async def upload(files: list[UploadFile] = File(...), paths: list[str] = Form(de
 @app.post("/api/process-folder")
 async def process_folder(req: Request):
     body = await req.json()
-    p = Path(os.path.expanduser(body.get("path", "").strip().strip('"')))
+    raw = str(body.get("path", "") or "").strip().strip('"').strip()
+    if not raw:   # Path("") is ".", which would process the app's own folder (output included)
+        raise HTTPException(400, "Enter a folder path")
+    p = Path(os.path.expanduser(raw))
     if not p.is_dir():
         raise HTTPException(400, f"Folder not found: {p}")
-    if out_dir() in p.resolve().parents or p.resolve() == out_dir().resolve():
+    src, out = p.resolve(), out_dir().resolve()
+    if src == out or out in src.parents:
         raise HTTPException(400, "Input folder cannot be inside the output folder")
+    if src in out.parents:   # e.g. the project folder or C:\ - would re-process already released records
+        raise HTTPException(400, f"Input folder contains the output folder ({out}); choose the folder with the new studies only")
     return _start(engine.Job(p, dict(SETTINGS)))
 
 

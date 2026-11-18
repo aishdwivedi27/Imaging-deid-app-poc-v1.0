@@ -140,10 +140,16 @@ function setJob(title, sub, pct) {
   p.classList.toggle("indeterminate", pct === null);
   $("progress").style.width = pct === null ? "" : pct + "%";
 }
-function log(text, cls = "", at) {
+function log(text, cls = "", at, recordId) {
   const li = document.createElement("li");
   li.className = cls;
   li.innerHTML = `<time>${fmtTime(at || new Date().toISOString())}</time>${esc(text)}`;
+  if (recordId) {   // entry points at an existing record: open it in the drawer
+    li.classList.add("link"); li.tabIndex = 0; li.title = `Open ${recordId}`;
+    const open = async () => { if (!state.records.some((x) => x.record_id === recordId)) await loadRecords(); openDrawer(recordId); };
+    li.addEventListener("click", open);
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  }
   $("log").prepend(li);
 }
 function renderStats() {
@@ -166,6 +172,13 @@ function handle(ev) {
       setJob(ev.studies ? `Processing 0 of ${ev.studies}` : "Nothing new to process", ev.studies ? "One study at a time" : "All files were already processed or were not DICOM", ev.studies ? 0 : 100);
       break;
     }
+    case "already_processed":
+      for (const r of ev.records) {
+        const n = `${r.files} file${r.files !== 1 ? "s" : ""}`;
+        if (r.missing) log(`Already processed: ${n} skipped — belonged to record ${r.record_id}, but its folder is gone (${r.folder}). These files stay skipped until removed from the ledger.`, "err", ev.at);
+        else log(`Already processed: ${n} skipped — already in record ${r.record_id} (QA ${r.qa_status}) at ${r.folder}. Click to open.`, "rev", ev.at, r.record_id);
+      }
+      break;
     case "record_start":
       setJob(`Processing ${t.records + 1} of ${t.total}`, `De-identifying ${ev.record_id} · ${ev.images} file${ev.images > 1 ? "s" : ""}`, (100 * t.records / Math.max(t.total, 1)));
       break;
@@ -183,14 +196,16 @@ function handle(ev) {
       break;
     }
     case "record_error":
-      log(`Error in one study: ${ev.error}`, "err", ev.at); break;
+      log(`Error in study ${ev.record_id || "(unknown)"}: ${ev.error} — its files will be retried on the next run`, "err", ev.at); break;
     case "cancelled":
       finish(`Stopped after ${ev.done} record${ev.done !== 1 ? "s" : ""}`, "You can run the same input again; finished files are skipped."); break;
     case "failed":
       log(ev.error, "err", ev.at); finish("Job failed", ev.error); break;
     case "finished": {
       const um = ev.unmatched_reports ? ` · ${ev.unmatched_reports} report(s) not matched to a study` : "";
-      finish(ev.done ? `Done — ${ev.done} record${ev.done !== 1 ? "s" : ""} de-identified` : "Done", `Saved to ${ev.output_dir}${um}`);
+      const title = ev.done ? `Done — ${ev.done} record${ev.done !== 1 ? "s" : ""} de-identified`
+                  : ev.total ? "Done" : "Nothing new — see the log for where earlier records are";
+      finish(title, `Saved to ${ev.output_dir}${um}`);
       loadRecords();
       break;
     }

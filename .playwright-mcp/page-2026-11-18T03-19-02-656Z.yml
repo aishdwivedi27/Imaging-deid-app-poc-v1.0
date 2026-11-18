@@ -1,0 +1,124 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e7]:
+      - heading "De-identification Station" [level=1] [ref=e8]
+      - paragraph [ref=e9]: X-ray · CT · Ultrasound · Reports — processed on this computer only
+    - generic [ref=e10]:
+      - generic "The server only listens on 127.0.0.1" [ref=e11]: Local only
+      - generic [ref=e12]: OCR ready
+      - generic [ref=e13]: Name detection ready
+      - link "Open OHIF viewer ↗" [ref=e14] [cursor=pointer]:
+        - /url: http://localhost:3000/local
+  - main [ref=e15]:
+    - complementary [ref=e16]:
+      - generic [ref=e17]:
+        - heading "1 Add studies" [level=2] [ref=e18]:
+          - generic [ref=e19]: "1"
+          - text: Add studies
+        - button "Drop files or folders here, or press Enter to browse" [ref=e20] [cursor=pointer]:
+          - strong [ref=e24]: Drop DICOM files, reports or whole folders
+          - generic [ref=e25]: Images with or without .dcm, reports as .txt or .docx
+          - generic [ref=e26]:
+            - button "Browse files" [ref=e27]
+            - button "Browse folder" [ref=e28]
+        - generic [ref=e29]: or process a folder already on this computer
+        - generic [ref=e31]:
+          - textbox "e.g. D:\\Exports\\2026-09 or ~/exports/sep" [ref=e32]:
+            - /placeholder: e.g. D:\Exports\2026-09  or  ~/exports/sep
+          - button "Run" [ref=e33] [cursor=pointer]
+        - paragraph [ref=e34]: Reads the folder in place and loops through it study by study. Nothing is copied or uploaded.
+      - generic [ref=e35]:
+        - heading "2 Options" [level=2] [ref=e36]:
+          - generic [ref=e37]: "2"
+          - text: Options
+        - generic [ref=e38]:
+          - generic [ref=e39]: Output folder
+          - generic [ref=e40]:
+            - textbox "Output folder Save C:\\Users\\aishd\\AppData\\Local\\Temp\\claude\\6405a563d1683a1c\\2e93dd4f-d4d0-46fc-8978-013054fe67fd\\scratchpad\\apptest\\out" [ref=e41]: out
+            - button "Save" [ref=e42] [cursor=pointer]
+          - generic [ref=e43]: C:\Users\aishd\AppData\Local\Temp\claude\6405a563d1683a1c\2e93dd4f-d4d0-46fc-8978-013054fe67fd\scratchpad\apptest\out
+        - generic [ref=e44] [cursor=pointer]:
+          - checkbox "Mask burned-in text OCR finds names printed on X-ray and ultrasound images and blacks them out" [checked]
+          - generic [ref=e47]:
+            - generic [ref=e48]: Mask burned-in text
+            - generic [ref=e49]: OCR finds names printed on X-ray and ultrasound images and blacks them out
+        - generic [ref=e50] [cursor=pointer]:
+          - checkbox "Find names in reports Second pass with Presidio after the rule-based redaction" [checked]
+          - generic [ref=e53]:
+            - generic [ref=e54]: Find names in reports
+            - generic [ref=e55]: Second pass with Presidio after the rule-based redaction
+        - generic [ref=e56]:
+          - generic [ref=e57]: Dates
+          - radiogroup [ref=e58]:
+            - radio "Shift" [checked] [ref=e59] [cursor=pointer]
+            - radio "Year only" [ref=e60] [cursor=pointer]
+            - radio "Remove" [ref=e61] [cursor=pointer]
+      - generic [ref=e62]:
+        - heading "Output structure" [level=2] [ref=e63]
+        - generic [ref=e64]: output/ ├─ S7DB2…C0A0/ one folder per record │ ├─ CR_002_00001.dcm │ ├─ report.txt redacted │ ├─ preview.png │ └─ record.json ├─ _needs_review/ QA failures held back ├─ deidentified_records.json └─ deidentified_records.csv
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - generic [ref=e68]:
+          - heading "Ready" [level=2] [ref=e69]
+          - paragraph [ref=e70]: Add studies to start. Each study becomes one de-identified record.
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - generic [ref=e74]: "0"
+            - text: Records
+          - generic [ref=e75]:
+            - generic [ref=e76]: "0"
+            - text: Images
+          - generic [ref=e77]:
+            - generic [ref=e78]: "0"
+            - text: Text regions masked
+          - generic [ref=e79]:
+            - generic [ref=e80]: "0"
+            - text: Report redactions
+          - generic [ref=e81]:
+            - generic [ref=e82]: "0"
+            - text: Need review
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - heading "Records 1" [level=2] [ref=e85]:
+            - text: Records
+            - generic [ref=e86]: "1"
+          - generic [ref=e87]:
+            - searchbox "Filter by ID, modality, body part…" [ref=e88]
+            - button "Open output folder" [ref=e89] [cursor=pointer]
+            - link "CSV" [ref=e90] [cursor=pointer]:
+              - /url: /api/download/csv
+            - link "JSON" [ref=e91] [cursor=pointer]:
+              - /url: /api/download/json
+        - table [ref=e93]:
+          - rowgroup [ref=e94]:
+            - row [ref=e95]:
+              - columnheader [ref=e96]
+              - columnheader "Record" [ref=e97]
+              - columnheader "Study" [ref=e98]
+              - columnheader "Images" [ref=e99]
+              - columnheader "Report" [ref=e100]
+              - columnheader "Redactions" [ref=e101]
+              - columnheader "Masked" [ref=e102]
+              - columnheader "QA" [ref=e103]
+              - columnheader "Processed" [ref=e104]
+          - rowgroup [ref=e105]:
+            - row [ref=e106] [cursor=pointer]:
+              - cell [ref=e107]
+              - cell "SC8B015A26709 PE4261E0955C9" [ref=e108]:
+                - text: SC8B015A26709
+                - generic [ref=e109]: PE4261E0955C9
+              - cell "CR CHEST XR CHEST PA - [REDACTED] [REDACTED] · 058Y M" [ref=e110]:
+                - generic [ref=e111]: CR
+                - text: CHEST
+                - generic [ref=e112]: XR CHEST PA - [REDACTED] [REDACTED] · 058Y M
+              - cell "1" [ref=e113]
+              - cell "Yes" [ref=e114]
+              - cell "8" [ref=e115]
+              - cell "3" [ref=e116]
+              - cell "Review" [ref=e117]
+              - cell "13:43:06" [ref=e119]
+  - complementary [aria-hidden] [ref=e120]:
+    - generic [ref=e121]:
+      - generic [ref=e122]: Record
+      - button [ref=e123] [cursor=pointer]: ✕
+    - heading [level=4] [ref=e126]: Redacted report
